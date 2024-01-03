@@ -72,6 +72,23 @@ BOT_ID = client.api_call("auth.test")["user_id"]
 
 # client.chat_postMessage(channel='#testing-bot', text="I Live!")
 
+@slack_events_adapter.on('reaction_added')
+def reaction_added(payload):
+    event = payload.get('event', {})
+    channel_id = event.get('item', {}).get('channel')
+    user_id = event.get('user')
+
+    if f'@{user_id}' not in welcome_messages:
+        return
+
+    welcome = welcome_messages[f'@{user_id}'][user_id]
+    welcome.completed = True
+    # blegh the reference of dm channel id is weird so hard coding it here
+    welcome.channel = channel_id
+    message = welcome.get_message()
+    updated_message = client.chat_update(**message)
+    welcome.timestamp = updated_message['ts']
+
 @slack_events_adapter.on('message')
 def message(payload):
     event = payload.get('event', {})
@@ -86,7 +103,7 @@ def message(payload):
             message_counts[user_id] = 1
 
         if text.lower() == 'start':
-            send_welcome_message(channel_id, user_id)
+            send_welcome_message(f'@{user_id}', user_id)
 
 @app.route('/message-count', methods=['POST'])
 def message_count():
